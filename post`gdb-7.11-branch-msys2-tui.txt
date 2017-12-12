@@ -1,0 +1,196 @@
+2016-09-13  Giah de Barag  <gdb@crelg.com>
+
+
+Summary
+-------
+
+Here is a patch and a build recipe for GDB on MSYS2 to enable TUI mode.
+
+The current gdb (7.11.1) in MSYS2 does not support TUI mode. However, GDB
+TUI mode works fine on MSYS2. It depends upon python, curses, and three
+environment variables: PYTHONHOME (/mingw32 or /mingw64) and TERMINFO
+(/usr/share/terminfo) and TERM.
+
+
+Impact
+------
+
+This patch only affects builds where (#if defined __MINGW32__) is true.
+
+
+Explanation of Changes
+----------------------
+
+GDB works fine in emacs, in bash, and in mintty. In the Windows Console (start
+cmd.exe) TUI mode works also. TUI mode depends upon ncurses and python. Have
+them ready before running configure.
+
+Eli Zaretski (https://www.sourceware.org/ml/gdb/2014-12/msg00039.html)
+comments that he had to “hide libncurses from the configure script in order to
+build a working debugger.” This comment might be dated.
+
+GDB with TUI mode works fine on MSYS2 with curses, with this small patch. I saw
+that getch() (which becomes the ncurses getch() when you link in ncurses) in
+input.c returns EOF as soon as you hit any character. Fortunately, Windows
+conio has deprecated getch() and has defined _getch() in its place. So I
+changed it to _getch(), to access the conio version.
+
+There is a tiny issue now that with this conio _getch(), gdb does not properly
+process backspace characters.
+
+Not having backspace characters in plain non-TUI mode in the Windows Console
+is hardly bothersome, because you can type “tui enable” and have a better
+environment. If you have to be in non-TUI mode for some reason, a workaround
+is [Ctrl]-[L] to refresh the line. Therefore I am using conio _getch() not
+ncurses getch().
+
+
+Note to GDB Maintainers
+-----------------------
+
+Someone with understanding of event handling by gdb, Windows conio, and UNIX
+curses: Can you please look where there is “getch()” in rl_getc() in input.c
+and see why it returns EOF no matter what (when linking with ncurses). Then do
+as I did in this patch and change it to _getch() to access the conio version
+and see why backspace characters are not handled properly. They are processed,
+but the display is not refreshed, and you have to hit [Ctrl]-[L] to refresh.
+
+Also, this is the first time I am doing something like this, so if I am
+neglecting any rule of communication of this list, please inform me, and I
+will correct it.
+
+
+MSYS2 GDB Build Recipe
+----------------------
+
+# Steps to produce a (debuggable) gdb with TUI mode support on MSYS2:
+
+# These steps are tested with Server 2008 R2 which is supposed to be
+# similar to Windows 7.
+
+# Install MSYS2
+
+# see also http://msys2.github.io
+
+wget http://repo.msys2.org/distrib/msys2-x86-64-latest.exe
+
+# update msys2
+
+pacman --noconfirm -Sy pacman # update pacman (quit mintty and restart)
+pacman --noconfirm -Syu       # update package db (quit mintty and restart)
+pacman --noconfirm -Su        # update packages (repeat until nothing changes)
+
+# get a bunch of stuff
+
+arch=i686
+# OR
+arch=x86-64
+
+# These are all the packages I currently use. You probably don’t need all
+# these packages, but you definitely need python and curses.
+
+pacman --needed --noconfirm -S base-devel git svn tar zip unzip asciidoc
+pacman --needed --noconfirm -S mingw-w64-${arch}-emacs
+pacman --needed --noconfirm -S mingw-w64-${arch}-toolchain
+pacman --needed --noconfirm -S mingw-w64-${arch}-libxml2
+pacman --needed --noconfirm -S mingw-w64-${arch}-gnutls
+pacman --needed --noconfirm -S mingw-w64-${arch}-libxslt
+pacman --needed --noconfirm -S mingw-w64-${arch}-libjpeg-turbo
+pacman --needed --noconfirm -S mingw-w64-${arch}-libtiff
+pacman --needed --noconfirm -S mingw-w64-${arch}-giflib
+pacman --needed --noconfirm -S mingw-w64-${arch}-icu
+pacman --needed --noconfirm -S mingw-w64-${arch}-libsndfile
+pacman --needed --noconfirm -S mingw-w64-${arch}-aspell
+pacman --needed --noconfirm -S mingw-w64-${arch}-lcms
+pacman --needed --noconfirm -S mingw-w64-${arch}-lcms2
+pacman --needed --noconfirm -S mingw-w64-${arch}-sqlite3
+pacman --needed --noconfirm -S mingw-w64-${arch}-windows-default-manifest 
+
+# Get and build GDB (same version as in MSYS2 pacman)
+
+# see https://www.gnu.org/software/gdb/current/
+
+git clone -b gdb-7.11-branch git://sourceware.org/git/binutils-gdb.git
+./configure
+make
+
+# Debug GDB with itself. Use existing gdb in emacs to debug the newly-built
+# gdb, in tui mode, in a Windows Console. To improve debugging experience,
+# modify the CFLAGS that you just used to build GDB.
+
+cd binutils-gdb/gdb
+runemacs
+M-x gdb
+gdb --annotate=0 -i=mi ./gdb
+set new-console on
+set args -tui
+run
+
+
+Note to MSYS2 Maintainers
+-------------------------
+
+Is this enough info for you to be able to build an improved GDB that supports
+TUI mode? Or do you need me to refine down the list of packages that has to be
+installed before building GDB?
+
+
+Patches
+-------
+
+Attached is patch relative to gdb-7.11-branch. All it does is change getch()
+to _getch() in input.c (and remove compiler warnings about implicitly declared
+Windows conio functions _kbhit() and _getch()).
+
+
+----- CUT HERE -----
+diff --git a/readline/input.c b/readline/input.c
+index 7c74c99..57df227 100644
+--- a/readline/input.c
++++ b/readline/input.c
+@@ -69,6 +69,10 @@ extern int errno;
+ #include "rlshell.h"
+ #include "xmalloc.h"
+ 
++#if defined (__MINGW32__)
++#include <conio.h>
++#endif
++
+ /* What kind of non-blocking I/O do we have? */
+ #if !defined (O_NDELAY) && defined (O_NONBLOCK)
+ #  define O_NDELAY O_NONBLOCK	/* Posix style */
+@@ -190,7 +194,7 @@ rl_gather_tyi ()
+ #endif
+ 
+   result = -1;
+-#if defined (FIONREAD)
++#if defined (FIONREAD) && !defined (__MINGW32__)
+   errno = 0;
+   result = ioctl (tty, FIONREAD, &chars_avail);
+   if (result == -1 && errno == EIO)
+@@ -286,7 +290,7 @@ _rl_input_available ()
+   fd_set readfds, exceptfds;
+   struct timeval timeout;
+ #endif
+-#if !defined (HAVE_SELECT) && defined(FIONREAD)
++#if !defined (HAVE_SELECT) && defined(FIONREAD) && !defined (__MINGW32__)
+   int chars_avail;
+ #endif
+   int tty;
+@@ -303,7 +307,7 @@ _rl_input_available ()
+   return (select (tty + 1, &readfds, (fd_set *)NULL, &exceptfds, &timeout) > 0);
+ #else
+ 
+-#if defined (FIONREAD)
++#if defined (FIONREAD) && !defined (__MINGW32__)
+   if (ioctl (tty, FIONREAD, &chars_avail) == 0)
+     return (chars_avail);
+ #endif
+@@ -466,6 +470,6 @@ rl_getc (stream)
+ 
+ #if defined (__MINGW32__)
+       if (isatty (fileno (stream)))
+-	return (getch ());
++	return (_getch ()); /* use conio; ncurses makes tui work, but getch() here returns EOF */
+ #endif
+       result = read (fileno (stream), &c, sizeof (unsigned char));

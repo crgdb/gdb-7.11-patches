@@ -1,0 +1,345 @@
+ gdb/breakpoint.c |   1 +
+ gdb/c-exp.y      | 162 ++++++++++++++++++++++++++++++++++++++++++++++++++-----
+ gdb/objc-lang.c  |   5 +-
+ readline/input.c |  12 +++--
+ 4 files changed, 161 insertions(+), 19 deletions(-)
+
+diff --git a/gdb/breakpoint.c b/gdb/breakpoint.c
+index f99a7ab..d3a5a44 100644
+--- a/gdb/breakpoint.c
++++ b/gdb/breakpoint.c
+@@ -10563,6 +10563,7 @@ watchpoint_exp_is_const (const struct expression *exp)
+ 	case OP_TYPEID:
+ 	case OP_NAME:
+ 	case OP_OBJC_NSSTRING:
++	case OP_OBJC_SELECTOR:
+ 
+ 	case UNOP_NEG:
+ 	case UNOP_LOGICAL_NOT:
+diff --git a/gdb/c-exp.y b/gdb/c-exp.y
+index 9f2a229..dd8c8d0 100644
+--- a/gdb/c-exp.y
++++ b/gdb/c-exp.y
+@@ -129,6 +129,8 @@ void yyerror (char *);
+ 
+ static int type_aggregate_p (struct type *);
+ 
++static struct typed_stoken *last_parsed_token;
++
+ %}
+ 
+ /* Although the yacc "value" of an expression is not used,
+@@ -175,6 +177,8 @@ static struct stoken operator_stoken (const char *);
+ static void check_parameter_typelist (VEC (type_ptr) *);
+ static void write_destructor_name (struct parser_state *par_state,
+ 				   struct stoken);
++static void write_exp_nsstring (struct parser_state *par_state, struct typed_stoken *token);
++static void write_exp_selector (struct parser_state *par_state, struct typed_stoken *token);
+ 
+ #ifdef YYBISON
+ static void c_print_token (FILE *file, int type, YYSTYPE value);
+@@ -209,7 +213,7 @@ static void c_print_token (FILE *file, int type, YYSTYPE value);
+ 
+ %token <tsval> STRING
+ %token <sval> NSSTRING		/* ObjC Foundation "NSString" literal */
+-%token SELECTOR			/* ObjC "@selector" pseudo-operator   */
++%token <sval> SELECTOR		/* ObjC "@selector" pseudo-operator   */
+ %token <tsval> CHAR
+ %token <ssym> NAME /* BLOCKNAME defined below to give it higher precedence. */
+ %token <ssym> UNKNOWN_CPP_NAME
+@@ -779,10 +783,11 @@ exp	:	VARIABLE
+ 			}
+ 	;
+ 
+-exp	:	SELECTOR '(' name ')'
+-			{
+-			  write_exp_elt_opcode (pstate, OP_OBJC_SELECTOR);
+-			  write_exp_string (pstate, $3);
++exp	:	SELECTOR	/* ObjC selector literal
++				 * of the form @selector(foo:bar:)
++				 */
++			{ write_exp_elt_opcode (pstate, OP_OBJC_SELECTOR);
++			  write_exp_selector   (pstate, last_parsed_token);
+ 			  write_exp_elt_opcode (pstate, OP_OBJC_SELECTOR); }
+ 	;
+ 
+@@ -894,11 +899,11 @@ exp	:	string_exp
+ 			}
+ 	;
+ 
+-exp     :	NSSTRING	/* ObjC NextStep NSString constant
+-				 * of the form '@' '"' string '"'.
++exp     :	NSSTRING	/* ObjC GNUstep NSString literal
++				 * of the form @"foo"
+ 				 */
+ 			{ write_exp_elt_opcode (pstate, OP_OBJC_NSSTRING);
+-			  write_exp_string (pstate, $1);
++			  write_exp_nsstring   (pstate, last_parsed_token);
+ 			  write_exp_elt_opcode (pstate, OP_OBJC_NSSTRING); }
+ 	;
+ 
+@@ -1216,6 +1221,14 @@ type	:	ptype
+ typebase  /* Implements (approximately): (type-qualifier)* type-specifier */
+ 	:	TYPENAME
+ 			{ $$ = $1.type; }
++	|	CLASSNAME
++			{
++			  if ($1.type == NULL)
++			    error ("No symbol \"%s\" in current context.", 
++				   copy_name($1.stoken));
++			  else
++			    $$ = $1.type;
++			}
+ 	|	INT_KEYWORD
+ 			{ $$ = lookup_signed_typename (parse_language (pstate),
+ 						       parse_gdbarch (pstate),
+@@ -1659,6 +1672,26 @@ name_not_typename :	NAME
+ 
+ %%
+ 
++static void
++write_exp_nsstring (struct parser_state *par_state, struct typed_stoken *value)
++/* Like write_exp_string, but for Objective C NSString literal, @"foo" */
++{
++  struct stoken token;
++  token.length = value->length;
++  token.ptr    = value->ptr;
++  write_exp_string (par_state, token);
++}
++
++static void
++write_exp_selector (struct parser_state *par_state, struct typed_stoken *value)
++/* Like write_exp_string, but for Objective C selector macro, @selector(foo:bar:) */
++{
++  struct stoken token;
++  token.length = value->length;
++  token.ptr    = value->ptr;
++  write_exp_string (par_state, token);
++}
++
+ /* Like write_exp_string, but prepends a '~'.  */
+ 
+ static void
+@@ -2250,11 +2283,113 @@ parse_string_or_char (const char *tokptr, const char **outptr,
+   value->ptr = (char *) obstack_base (&tempbuf);
+   value->length = obstack_object_size (&tempbuf);
+ 
++  last_parsed_token = value;
++
+   *outptr = tokptr;
+ 
+   return quote == '"' ? (is_objc ? NSSTRING : STRING) : CHAR;
+ }
+ 
++/* Scan an objc selector literal (described by the following regex) from
++   TOKEN_STREAM, place $1 (the value inside the literal parens) into VALUE
++   and return a pointer to the next input in the token_stream.
++ 
++       @?selector\(([0-9A-Za-z_:-]+)\)                                    
++ */
++static const char * 
++parse_objc_selector_literal (const char *tokptr, struct typed_stoken *value)
++{
++  const char	*s1  = NULL;
++  const char	*s2  = NULL;
++  const char	*str = NULL;	/* not null-terminated, just a pointer into token_stream */
++  int		 len = 0;
++  static unsigned sl;
++
++  /* skip any leading whitespace */
++  s1 = tokptr;
++  s1 = skip_spaces_const (s1);
++
++  /* parse the '@' */
++  if (*s1 == '@')
++    s1++;
++  s1 = skip_spaces_const (s1);
++
++  /* parse the word "selector" */
++  if (!sl)
++    sl = strlen("selector");
++  if (strncmp (s1, "selector", sl) != 0)
++    {
++      /* error (_("malformed @selector() macro: expected 'selector'")); */
++      return NULL;
++    }
++  s1 += sl;
++  s1 = skip_spaces_const (s1);
++
++  /* parse the open paren */
++  if (*s1 != '(')
++    {
++      error (_("malformed @selector() macro: expected '('"));
++      return NULL;
++    }
++  s1++;
++  s1 = skip_spaces_const (s1);
++  
++  str = s1;
++  s2  = s1;
++
++  /* parse the selector string [0-9A-Za-z_: -]) */
++  for (;;)
++    {
++      if (isalnum (*s2) || (*s2 == '_') || (*s2 == ':') || (*s2 == '-'))
++	;
++      else if (*s2 == ')' || isspace(*s2))
++	break;
++      else
++	{
++	  int buflen = s2 - s1;
++	  if (!tempbuf_init)
++	    tempbuf_init = 1;
++	  else
++	    obstack_free (&tempbuf, NULL);
++	  obstack_init (&tempbuf);
++	  obstack_grow (&tempbuf, str, buflen);
++	  obstack_1grow (&tempbuf, '\0');
++	  error ("illegal selector: \"%s\"", tempbuf);
++	  obstack_free (&tempbuf, NULL);
++	  return NULL;
++	}
++      s2++;
++    }
++  len = s2 - s1;
++
++  /* slurp up spaces if terminator was ')' */
++  s2++;
++  s2 = skip_spaces_const (s2);
++
++  /* slurp up ')' if terminator was space(s) */
++  if (*s2 == ')')
++      s2++;
++  s2 = skip_spaces_const (s2);
++
++  /* save the token for reference in the productions */
++  gdb_assert (value != NULL);
++  if (!tempbuf_init)
++      tempbuf_init = 1;
++  else
++      obstack_free (&tempbuf, NULL);
++
++  obstack_init (&tempbuf);
++  obstack_grow (&tempbuf, str, len);
++
++  value->type   = SELECTOR;
++  value->ptr    = (char *) obstack_base (&tempbuf);
++  value->length = obstack_object_size (&tempbuf);
++
++  last_parsed_token = value;
++
++  return s2;
++}
++
+ /* This is used to associate some attributes with a token.  */
+ 
+ enum token_flag
+@@ -2655,14 +2790,14 @@ lex_one_token (struct parser_state *par_state, int *is_quoted_name)
+ 
+ 	if (parse_language (par_state)->la_language == language_objc)
+ 	  {
+-	    size_t len = strlen ("selector");
+-
+-	    if (strncmp (p, "selector", len) == 0
+-		&& (p[len] == '\0' || isspace (p[len])))
++	    /* try to parse a selector literal */
++	    const char *newlexptr = parse_objc_selector_literal(p, &yylval.tsval);
++	    if (newlexptr != NULL)
+ 	      {
+-		lexptr = p + len;
++		lexptr = newlexptr; /* p + yylval.tsval.length */
+ 		return SELECTOR;
+ 	      }
++	    /* there was no selector so try to parse a string literal */
+ 	    else if (*p == '"')
+ 	      goto parse_string;
+ 	  }
+@@ -3291,6 +3426,7 @@ c_print_token (FILE *file, int type, YYSTYPE value)
+       break;
+ 
+     case NSSTRING:
++    case SELECTOR:
+     case VARIABLE:
+       fprintf (file, "sval<%s>", copy_name (value.sval));
+       break;
+diff --git a/gdb/objc-lang.c b/gdb/objc-lang.c
+index f58b1c4..d7ec15b 100644
+--- a/gdb/objc-lang.c
++++ b/gdb/objc-lang.c
+@@ -339,6 +339,7 @@ static const struct op_print objc_op_print_tab[] =
+     {"/",  BINOP_DIV, PREC_MUL, 0},
+     {"%",  BINOP_REM, PREC_MUL, 0},
+     {"@",  BINOP_REPEAT, PREC_REPEAT, 0},
++    {"+",  UNOP_PLUS, PREC_PREFIX, 0},
+     {"-",  UNOP_NEG, PREC_PREFIX, 0},
+     {"!",  UNOP_LOGICAL_NOT, PREC_PREFIX, 0},
+     {"~",  UNOP_COMPLEMENT, PREC_PREFIX, 0},
+@@ -358,7 +359,7 @@ const struct language_defn objc_language_defn = {
+   case_sensitive_on,
+   array_row_major,
+   macro_expansion_c,
+-  &exp_descriptor_standard,
++  &exp_descriptor_c,
+   c_parse,
+   c_error,
+   null_post_parser,
+@@ -385,7 +386,7 @@ const struct language_defn objc_language_defn = {
+   c_language_arch_info,
+   default_print_array_index,
+   default_pass_by_reference,
+-  default_get_string,
++  c_get_string,
+   NULL,				/* la_get_symbol_name_cmp */
+   iterate_over_symbols,
+   &default_varobj_ops,
+diff --git a/readline/input.c b/readline/input.c
+index 7c74c99..25b9b49 100644
+--- a/readline/input.c
++++ b/readline/input.c
+@@ -69,6 +69,10 @@ extern int errno;
+ #include "rlshell.h"
+ #include "xmalloc.h"
+ 
++#if defined (__MINGW32__)
++#include <conio.h>
++#endif
++
+ /* What kind of non-blocking I/O do we have? */
+ #if !defined (O_NDELAY) && defined (O_NONBLOCK)
+ #  define O_NDELAY O_NONBLOCK	/* Posix style */
+@@ -190,7 +194,7 @@ rl_gather_tyi ()
+ #endif
+ 
+   result = -1;
+-#if defined (FIONREAD)
++#if defined (FIONREAD) && !defined (__MINGW32__)
+   errno = 0;
+   result = ioctl (tty, FIONREAD, &chars_avail);
+   if (result == -1 && errno == EIO)
+@@ -286,7 +290,7 @@ _rl_input_available ()
+   fd_set readfds, exceptfds;
+   struct timeval timeout;
+ #endif
+-#if !defined (HAVE_SELECT) && defined(FIONREAD)
++#if !defined (HAVE_SELECT) && defined(FIONREAD) && !defined (__MINGW32__)
+   int chars_avail;
+ #endif
+   int tty;
+@@ -303,7 +307,7 @@ _rl_input_available ()
+   return (select (tty + 1, &readfds, (fd_set *)NULL, &exceptfds, &timeout) > 0);
+ #else
+ 
+-#if defined (FIONREAD)
++#if defined (FIONREAD) && !defined (__MINGW32__)
+   if (ioctl (tty, FIONREAD, &chars_avail) == 0)
+     return (chars_avail);
+ #endif
+@@ -466,7 +470,7 @@ rl_getc (stream)
+ 
+ #if defined (__MINGW32__)
+       if (isatty (fileno (stream)))
+-	return (getch ());
++	return (_getch ()); /* use conio not ncurses */
+ #endif
+       result = read (fileno (stream), &c, sizeof (unsigned char));
+ 

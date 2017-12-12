@@ -1,0 +1,82 @@
+2016-09-27  Giah de Barag  <gdb@crelg.com>
+
+
+Summary
+-------
+
+This new patch restores a newly-discovered removed piece of objective-c
+language support.
+
+This piece (like those previously reported) seems to have been
+inadvertently removed when objc-eval.y was deleted.
+
+
+Problem Behavior
+----------------
+
+This problem surfaces when typecasting an object pointer to a class type
+(in order to dereference it and examine its member variables).
+
+(gdb) p (NSAutoreleasePool *)pool
+A syntax error in expression, near `NSAutoreleasePool *)pool'.
+(gdb)
+
+
+Correction
+----------
+
+Applying this patch corrects the problem by simply restoring a rule from
+objc-eval.y (that was lost when objc-eval.y was deleted).
+
+
+Corrected Behavior
+------------------
+
+After applying the patch, the problem disappears and the missing
+language support reappears. Here is a pointer to an object being
+typecast in order to be dereferenced.
+
+(gdb) p (NSAutoreleasePool *)pool
+$2 = (struct NSAutoreleasePool *) 0x6e0a58
+(gdb) p *$
+$3 =
+{
+  {
+    isa = 0x671fee80 <_OBJC_Class_NSAutoreleasePool>
+  },
+  _parent = 0x0,
+  _child = 0x0,
+  _released = 0x4c15818,
+  _released_head = 0x6e1178,
+  _released_count = 8889,
+  _addImp = 0x670219fa <-[NSAutoreleasePool addObject:]>,
+  _internal = 0x0
+}
+(gdb)
+
+
+Patch
+-----
+
+Here is the patch. It restores one rule from objc-eval.y.
+
+----- CUT HERE -----
+diff --git a/gdb/c-exp.y b/gdb/c-exp.y
+@@ -1216,6 +1221,14 @@ type	:	ptype
+ typebase  /* Implements (approximately): (type-qualifier)* type-specifier */
+ 	:	TYPENAME
+ 			{ $$ = $1.type; }
++	|	CLASSNAME
++			{
++			  if ($1.type == NULL)
++			    error ("No symbol \"%s\" in current context.", 
++				   copy_name($1.stoken));
++			  else
++			    $$ = $1.type;
++			}
+ 	|	INT_KEYWORD
+ 			{ $$ = lookup_signed_typename (parse_language (pstate),
+ 						       parse_gdbarch (pstate),
+----- CUT HERE -----
+
+

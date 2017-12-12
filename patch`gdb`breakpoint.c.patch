@@ -1,0 +1,15 @@
+ gdb/breakpoint.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/gdb/breakpoint.c b/gdb/breakpoint.c
+index f99a7ab..d3a5a44 100644
+--- a/gdb/breakpoint.c
++++ b/gdb/breakpoint.c
+@@ -10563,6 +10563,7 @@ watchpoint_exp_is_const (const struct expression *exp)
+ 	case OP_TYPEID:
+ 	case OP_NAME:
+ 	case OP_OBJC_NSSTRING:
++	case OP_OBJC_SELECTOR:
+ 
+ 	case UNOP_NEG:
+ 	case UNOP_LOGICAL_NOT:

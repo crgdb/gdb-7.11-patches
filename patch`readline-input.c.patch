@@ -1,0 +1,54 @@
+ readline/input.c | 12 ++++++++----
+ 1 file changed, 8 insertions(+), 4 deletions(-)
+
+diff --git a/readline/input.c b/readline/input.c
+index 7c74c99..57df227 100644
+--- a/readline/input.c
++++ b/readline/input.c
+@@ -69,6 +69,10 @@ extern int errno;
+ #include "rlshell.h"
+ #include "xmalloc.h"
+ 
++#if defined (__MINGW32__)
++#include <conio.h>
++#endif
++
+ /* What kind of non-blocking I/O do we have? */
+ #if !defined (O_NDELAY) && defined (O_NONBLOCK)
+ #  define O_NDELAY O_NONBLOCK	/* Posix style */
+@@ -190,7 +194,7 @@ rl_gather_tyi ()
+ #endif
+ 
+   result = -1;
+-#if defined (FIONREAD)
++#if defined (FIONREAD) && !defined (__MINGW32__)
+   errno = 0;
+   result = ioctl (tty, FIONREAD, &chars_avail);
+   if (result == -1 && errno == EIO)
+@@ -286,7 +290,7 @@ _rl_input_available ()
+   fd_set readfds, exceptfds;
+   struct timeval timeout;
+ #endif
+-#if !defined (HAVE_SELECT) && defined(FIONREAD)
++#if !defined (HAVE_SELECT) && defined(FIONREAD) && !defined (__MINGW32__)
+   int chars_avail;
+ #endif
+   int tty;
+@@ -303,7 +307,7 @@ _rl_input_available ()
+   return (select (tty + 1, &readfds, (fd_set *)NULL, &exceptfds, &timeout) > 0);
+ #else
+ 
+-#if defined (FIONREAD)
++#if defined (FIONREAD) && !defined (__MINGW32__)
+   if (ioctl (tty, FIONREAD, &chars_avail) == 0)
+     return (chars_avail);
+ #endif
+@@ -466,7 +470,7 @@ rl_getc (stream)
+ 
+ #if defined (__MINGW32__)
+       if (isatty (fileno (stream)))
+-	return (getch ());
++	return (_getch ()); /* use conio; ncurses makes tui work, but getch() here returns EOF */
+ #endif
+       result = read (fileno (stream), &c, sizeof (unsigned char));
+ 

@@ -1,0 +1,33 @@
+ gdb/objc-lang.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/gdb/objc-lang.c b/gdb/objc-lang.c
+index f58b1c4..d7ec15b 100644
+--- a/gdb/objc-lang.c
++++ b/gdb/objc-lang.c
+@@ -339,6 +339,7 @@ static const struct op_print objc_op_print_tab[] =
+     {"/",  BINOP_DIV, PREC_MUL, 0},
+     {"%",  BINOP_REM, PREC_MUL, 0},
+     {"@",  BINOP_REPEAT, PREC_REPEAT, 0},
++    {"+",  UNOP_PLUS, PREC_PREFIX, 0},
+     {"-",  UNOP_NEG, PREC_PREFIX, 0},
+     {"!",  UNOP_LOGICAL_NOT, PREC_PREFIX, 0},
+     {"~",  UNOP_COMPLEMENT, PREC_PREFIX, 0},
+@@ -358,7 +359,7 @@ const struct language_defn objc_language_defn = {
+   case_sensitive_on,
+   array_row_major,
+   macro_expansion_c,
+-  &exp_descriptor_standard,
++  &exp_descriptor_c,
+   c_parse,
+   c_error,
+   null_post_parser,
+@@ -385,7 +386,7 @@ const struct language_defn objc_language_defn = {
+   c_language_arch_info,
+   default_print_array_index,
+   default_pass_by_reference,
+-  default_get_string,
++  c_get_string,
+   NULL,				/* la_get_symbol_name_cmp */
+   iterate_over_symbols,
+   &default_varobj_ops,
