@@ -22,11 +22,11 @@ These patches enable GDB to (once again) evaluate such objective-c
 expressions as:
 
 ```objective-c
-[object message:arg] messages,
-@"foo" NSStrings, and
-@selector(foo:bar:) selectors.
-"foo" c strings
-p (NSAutoreleasePool *)pool
+p [object message:arg]      // method invocation
+p @"foo"                    // @"string" construct
+p @selector(foo:bar:)       // @selector() construct
+p "foo"                     // regular c strings (even these were broken in objective-c mode!)
+p (NSAutoreleasePool *)pool // objective-c classes
 ```
 
 Author
