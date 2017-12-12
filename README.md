@@ -4,15 +4,21 @@ gdb-7.11-patch
 Summary
 -------
 
-Patches are presented which restore objective-c language support on all operating systems.
+Restore objective-c language support.
 
-These patches are relative to the head of the gdb-7.11-branch.
+Enable TUI mode (with built-in readline).
+
+Relative to the head of the gdb-7.11-branch.
 
 
 Impact
 ------
 
-These changes impact only objective-c language mode.
+Objective-c language mode
+
+TUI mode
+
+All operating systems
 
 
 Description
