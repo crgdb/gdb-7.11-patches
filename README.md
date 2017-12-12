@@ -4,7 +4,7 @@ gdb-7.11-patch
 Summary
 -------
 
-Patches are presented which restore objective-c language support.
+Patches are presented which restore objective-c language support on all operating systems.
 
 These patches are relative to the head of the gdb-7.11-branch.
 
@@ -29,8 +29,19 @@ p "foo"                     // regular c strings (even these were broken in obje
 p (NSAutoreleasePool *)pool // objective-c classes
 ```
 
-Author
-------
 
-Giah De Barag
+How to use
+----------
+
+```
+git clone -b gdb-7.11-branch git://sourceware.org/git/binutils-gdb.git
+(apply patches)
+./configure
+make
+```
+
+Questions
+---------
+
+Giah De Barag<br>
 gdb@crelg.com
