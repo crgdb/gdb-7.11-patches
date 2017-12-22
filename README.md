@@ -45,7 +45,7 @@ p "foo"                     // regular c strings (yes,
                             // even c became broken
                             // in objective-c mode!)
 ```
-
+*Without these patches, none of these work, and trying them causes GDB to crash.*
 
 ## Usage
 
@@ -147,14 +147,14 @@ mode working too).
 
 ## Version
 
-Again, all this information applies to the gdb-7.11 branch.
+Again, all this information applies to the **gdb-7.11** branch.
 
 
 ## References
 
 Background on GDB and Objective C
 
-* [GDB and Objective C](https://sourceware.org/ml/gdb-patches/2016-09/msg00170.html)
+* [GDB and Objective C](https://sourceware.org/ml/gdb-patches/2016-09/msg00170.html) (Some examples of how GDB evaluates Objective C expressions)
 
 Original patch contributions:
 
@@ -163,6 +163,6 @@ Original patch contributions:
 
 Reported bugs fixed by these patches:
 
-1. [“Bug 11925 - objc-exp.y doesn't handle floats with suffixes, e.g. 1.1f”](https://sourceware.org/bugzilla/show_bug.cgi?id=11925)
-1. [“Bug 20501 - Creating NSString convenience variable crashes GDB”](https://sourceware.org/bugzilla/show_bug.cgi?id=20501)
-1. [“Bug 20503 - ObjC runtime debugging support is severely broken”](https://sourceware.org/bugzilla/show_bug.cgi?id=20503)
+1. [Bug 11925 - objc-exp.y doesn't handle floats with suffixes, e.g. 1.1f](https://sourceware.org/bugzilla/show_bug.cgi?id=11925)
+1. [Bug 20501 - Creating NSString convenience variable crashes GDB](https://sourceware.org/bugzilla/show_bug.cgi?id=20501)
+1. [Bug 20503 - ObjC runtime debugging support is severely broken](https://sourceware.org/bugzilla/show_bug.cgi?id=20503)
