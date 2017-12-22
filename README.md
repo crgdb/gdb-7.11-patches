@@ -1,16 +1,16 @@
 <!-- markdown-toc start - Don't edit this section. Run M-x markdown-toc-refresh-toc -->
 **Table of Contents**
 
-- [gdb-7.11-patch](#gdb711patch)
+- [gdb-7.11-patch](#gdb-711-patch)
     - [Summary](#summary)
     - [Impact](#impact)
     - [Description](#description)
     - [Usage](#usage)
-    - [Changed Files](#changedfiles)
+    - [Changed Files](#changed-files)
 - [Background](#background)
     - [Why](#why)
     - [Status](#status)
-    - [Readline Quirk](#readlinequirk)
+    - [Readline Quirk](#readline-quirk)
     - [Version](#version)
     - [References](#references)
 
