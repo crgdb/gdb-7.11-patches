@@ -94,13 +94,11 @@ Around 2010 or 2011 (late gdb 6 to early gdb 7), one of the GDB
 maintainers made a big change which refactored a lot of the support
 for the C family of languages.
 
-Because of insufficient testing on this change, GDB’s objective-c
-language mode became unusable. The GDB maintainers rationalized that
-they lack the ability to test objective-c.
+Because of insufficient testing of this change, GDB’s objective-c
+language mode became unusable.
 
 The damage was so bad that even basic C language support was broken in
 objective-c language mode (objective-c is a proper superset of C).
-They just ignored objective-c mode.
 
 Even though clang and lldb are popular alternatives to gcc and gdb,
 there are still users of gcc and gdb.
@@ -108,6 +106,10 @@ there are still users of gcc and gdb.
 After studying GDB’s internals, I managed to figure out the puzzle and
 fixed all the problems. This repository contains the resulting patches
 (or diffs).
+
+It is a pity to leave gdb broken when the fix is this simple and
+actually finishes the work that the original GDB maintainer was trying
+to do.
 
 
 ## Status
@@ -123,7 +125,7 @@ is a baby step in that direction.
 ## Readline Quirk
 
 If you are building GDB as part of a large package system with the
-latest `readline` library, then plese just ignore the
+latest `readline` library, then please just ignore the
 `readline/input.c` patch, and stop reading here. Otherwise, if you are
 just buildng GDB standalone from its own source, read on.
 
