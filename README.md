@@ -4,6 +4,7 @@
 - [gdb-7.11-patch](#gdb-711-patch)
     - [Summary](#summary)
     - [Impact](#impact)
+    - [Version](#version)
     - [Description](#description)
     - [Usage](#usage)
     - [Changed Files](#changed-files)
@@ -11,7 +12,6 @@
     - [Why](#why)
     - [Status](#status)
     - [Readline Quirk](#readline-quirk)
-    - [Version](#version)
     - [References](#references)
 
 <!-- markdown-toc end -->
@@ -21,14 +21,18 @@
 
 ## Summary
 
-* Restore objective-c language support.
-* Relative to the head of the gdb-7.11-branch.
+Restore objective-c language support
 
 
 ## Impact
 
 * Objective-c language mode
 * All operating systems
+
+
+## Version
+
+All this information applies to the **gdb-7.11** branch.
 
 
 ## Description
@@ -79,10 +83,10 @@ Quirk”](#readlinequirk) for details.)*
 
 # Background
 
-The patches enable GDB to debug Objectie C code. Getting these patches
-into the GDB repository requires passing GDB’s test suite. The GDB
-code has a duplicate, old, copy of GNU `readline` which I tweaked just
-for present purposes of fixing the Objective C bugs.
+The patches enable GDB to debug Objectie C code.
+
+If someone has time to run the GDB test suite and validate these
+changes, we can try to get them into the GDB repository.
 
 
 ## Why
@@ -124,30 +128,25 @@ is a baby step in that direction.
 
 ## Readline Quirk
 
+The GDB code has its own copy of `readline` that is older than the
+latest gnu `readline`.
+
 If you are building GDB as part of a large package system with the
 latest `readline` library, then please just ignore the
-`readline/input.c` patch, and stop reading here. Otherwise, if you are
-just buildng GDB standalone from its own source, read on.
+`readline/input.c` patch and the rest of this section.
+
+Otherwise, if you are buildng GDB standalone, and you wish to rely
+upon the `readline` that is built into GDB, then read on.
 
 After I built GDB from source, I noticed that terminal command-line
 input was broken. Characters typed were not echoed and command editing
 keystrokes, like backpace, were transmitted as ascii bytes into the
-input. Not even `TUI` mode would work.
-
-The problem is that the GDB code has its own copy of `readline` that
-is older than the latest gnu `readline`. Funny that the GDB
-maintainers retain this old version and do not either update it or
-clean it out.
+input. Also `TUI` mode would not work.
 
 Since I was only interested in the objective-c language support, I
 just decided to hack the two or three lines of readline code to let
 the terminal command-line input work a little better (and it got `TUI`
 mode working too).
-
-
-## Version
-
-Again, all this information applies to the **gdb-7.11** branch.
 
 
 ## References
