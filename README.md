@@ -41,6 +41,7 @@ These patches restore GDB’s objective-c mode ability to evaluate such
 objective-c expressions as:
 
 ```objective-c
+b -[class method:]          // set breakpoint
 p [object message:arg]      // method invocation
 p @"foo"                    // @"string" construct
 p @selector(foo:bar:)       // @selector() construct
