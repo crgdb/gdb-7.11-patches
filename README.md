@@ -84,7 +84,7 @@ Quirk”](#readlinequirk) for details.)*
 
 # Background
 
-The patches enable GDB to debug Objectie C code.
+The patches enable GDB to debug Objective C code.
 
 If someone has time to run the GDB test suite and validate these
 changes, we can try to get them into the GDB repository.
