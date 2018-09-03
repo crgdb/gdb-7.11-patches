@@ -156,7 +156,7 @@ Background on GDB and Objective C
 
 * [GDB and Objective C](https://sourceware.org/ml/gdb-patches/2016-09/msg00170.html) (Some examples of how GDB evaluates Objective C expressions)
 
-Original patch contributions:
+Original patch contributions (all included in this repo):
 
 1. [Restored Objective-C language support (Part 1)](https://sourceware.org/ml/gdb-patches/2016-09/msg00100.html)
 1. [Restored Objective-C language support (Part 2)](https://sourceware.org/ml/gdb-patches/2016-09/msg00382.html)
