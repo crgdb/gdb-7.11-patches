@@ -149,6 +149,10 @@ just decided to hack the two or three lines of readline code to let
 the terminal command-line input work a little better (and it got `TUI`
 mode working too).
 
+<i>Again: You can ignore the readline/input.c patch if you have the
+latest gnu readline library and do not rely on the old copy of
+readline inside the GDB source.</i>
+
 
 ## References
 
